@@ -5,7 +5,7 @@ export const FoodModel = {
    * Mengambil semua data barang / makanan dengan opsi query
    */
   async findAll({ search, category, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
-    let query = supabase.from('foods').select('*', { count: 'exact' });
+    let query = supabase.from('products').select('*', { count: 'exact' });
 
     if (category) {
       query = query.ilike('category', `%${category}%`);
@@ -37,7 +37,7 @@ export const FoodModel = {
    */
   async findById(id) {
     const { data, error } = await supabase
-      .from('foods')
+      .from('products')
       .select('*')
       .eq('id', id)
       .maybeSingle();
@@ -51,7 +51,7 @@ export const FoodModel = {
    */
   async create(foodData) {
     const { data, error } = await supabase
-      .from('foods')
+      .from('products')
       .insert([foodData])
       .select()
       .single();
@@ -65,7 +65,7 @@ export const FoodModel = {
    */
   async update(id, updateData) {
     const { data, error } = await supabase
-      .from('foods')
+      .from('products')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -80,7 +80,7 @@ export const FoodModel = {
    */
   async delete(id) {
     const { data, error } = await supabase
-      .from('foods')
+      .from('products')
       .delete()
       .eq('id', id)
       .select()

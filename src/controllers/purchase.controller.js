@@ -11,3 +11,33 @@ export const createPurchase = async (req, res, next) => {
         next(error);
     }
 }
+
+export const updatePurchase = async(req, res, next) => {
+    try {
+        const user = res.locals.user;
+        const order = await purchaseService.updatePurchase(req.body, user);
+        successResponse(res, order, 'Order updated successfully', 200);
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const getPurchaseById = async(req, res, next) => {
+    try {
+        const user = res.locals.user;
+        const order = await purchaseService.getPurchaseById(req.params.id, user);
+        successResponse(res, order, 'Order fetched successfully', 200);
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const deletePurchase = async(req, res, next) => {
+    try {
+        const user = res.locals.user;
+        const order = await purchaseService.deletePurchase(req.params.id, user);
+        successResponse(res, order, 'Order deleted successfully', 200);
+    } catch (error) {
+        next(error);
+    }
+}

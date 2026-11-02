@@ -45,27 +45,26 @@ export const foodService = {
    * Membuat barang baru dengan validasi bisnis
    */
   async createFood(payload) {
-    const { name, description, price, stock, category, image_url } = payload;
+    const { name, description, harga, stock, category, image_url } = payload;
 
     if (!name || name.trim() === '') {
       throw new AppError('Nama barang (name) wajib diisi.', 400);
     }
 
-    if (price === undefined || price === null || isNaN(Number(price))) {
-      throw new AppError('Harga barang (price) wajib diisi dengan angka valid.', 400);
-    }
+    // if (price === undefined || price === null || isNaN(Number(price))) {
+    //   throw new AppError('Harga barang (price) wajib diisi dengan angka valid.', 400);
+    // }
 
-    if (Number(price) < 0) {
+    if (Number(harga) < 0) {
       throw new AppError('Harga barang tidak boleh bernilai negatif.', 400);
     }
 
     const newFoodData = {
       name: name.trim(),
       description: description ? description.trim() : null,
-      price: parseFloat(price),
+      harga: parseFloat(harga),
       stock: stock !== undefined ? parseInt(stock, 10) : 0,
-      category: category ? category.trim() : 'Umum',
-      image_url: image_url ? image_url.trim() : null,
+      is_empty: false,
     };
 
     if (newFoodData.stock < 0) {
