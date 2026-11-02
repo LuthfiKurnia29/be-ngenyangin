@@ -81,7 +81,7 @@ export const foodService = {
     // 1. Verifikasi barang ada
     await this.getFoodById(id);
 
-    const { name, description, price, stock, category, image_url } = payload;
+    const { name, description, harga, stock, category, image_url } = payload;
     const updateData = {};
 
     if (name !== undefined) {
@@ -95,11 +95,11 @@ export const foodService = {
       updateData.description = description ? description.trim() : null;
     }
 
-    if (price !== undefined) {
-      if (isNaN(Number(price)) || Number(price) < 0) {
+    if (harga !== undefined) {
+      if (isNaN(Number(harga)) || Number(harga) < 0) {
         throw new AppError('Harga barang harus berupa angka positif.', 400);
       }
-      updateData.price = parseFloat(price);
+      updateData.harga = parseFloat(harga);
     }
 
     if (stock !== undefined) {
@@ -109,13 +109,13 @@ export const foodService = {
       updateData.stock = parseInt(stock, 10);
     }
 
-    if (category !== undefined) {
-      updateData.category = category ? category.trim() : 'Umum';
-    }
+    // if (category !== undefined) {
+    //   updateData.category = category ? category.trim() : 'Umum';
+    // }
 
-    if (image_url !== undefined) {
-      updateData.image_url = image_url ? image_url.trim() : null;
-    }
+    // if (image_url !== undefined) {
+    //   updateData.image_url = image_url ? image_url.trim() : null;
+    // }
 
     if (Object.keys(updateData).length === 0) {
       throw new AppError('Tidak ada perubahan data yang dikirimkan.', 400);
