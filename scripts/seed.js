@@ -23,7 +23,7 @@ const seedFoods = [
   {
     name: 'Nasi Goreng Spesial',
     description: 'Nasi goreng dengan telur, suwir ayam, dan acar segar',
-    price: 25000,
+    harga: 25000,
     stock: 50,
     category: 'Makanan Berat',
     image_url: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b',
@@ -31,7 +31,7 @@ const seedFoods = [
   {
     name: 'Ayam Bakar Madu',
     description: 'Ayam panggang bumbu madu khas Nusantara',
-    price: 32000,
+    harga: 32000,
     stock: 30,
     category: 'Makanan Berat',
     image_url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b',
@@ -39,7 +39,7 @@ const seedFoods = [
   {
     name: 'Es Teh Manis',
     description: 'Teh melati manis segar dingin',
-    price: 5000,
+    harga: 5000,
     stock: 100,
     category: 'Minuman',
     image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc',
@@ -47,7 +47,7 @@ const seedFoods = [
   {
     name: 'Pisang Goreng Crispy',
     description: 'Pisang raja goreng tepung renyah dengan topping keju cokelat',
-    price: 18000,
+    harga: 18000,
     stock: 40,
     category: 'Camilan',
     image_url: 'https://images.unsplash.com/photo-1528751014936-863e6e7a319c',
@@ -76,14 +76,14 @@ async function runSeed() {
     console.log(`✅ Berhasil memasukkan ${usersData?.length || 0} user.`);
 
     // 2. Seed Foods
-    console.log('🍔 Seeding tabel `foods`...');
+    console.log('🍔 Seeding tabel `products`...');
     const { data: foodsData, error: foodsError } = await supabase
-      .from('foods')
+      .from('products')
       .upsert(seedFoods, { onConflict: 'name' })
       .select();
 
     if (foodsError) {
-      throw new Error(`Gagal seeding foods: ${foodsError.message}`);
+      throw new Error(`Gagal seeding products: ${foodsError.message}`);
     }
     console.log(`✅ Berhasil memasukkan ${foodsData?.length || 0} item makanan.`);
 

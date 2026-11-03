@@ -15,15 +15,15 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Tabel Foods / Products
-CREATE TABLE IF NOT EXISTS foods (
+-- 2. Tabel Products (dipakai FoodModel: from('products'))
+CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(150) NOT NULL,
+    name VARCHAR(150) UNIQUE NOT NULL,
     description TEXT,
-    price NUMERIC(12, 2) NOT NULL,
+    harga NUMERIC(12, 2) NOT NULL,
     stock INT DEFAULT 0,
+    is_empty BOOLEAN DEFAULT FALSE,
     category VARCHAR(50),
     image_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
