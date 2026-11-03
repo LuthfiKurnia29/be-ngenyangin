@@ -55,3 +55,16 @@ export const getMe = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Update profil user yang sedang login
+ * PUT /api/v1/auth/profile
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    const user = await authService.updateProfile(req.user, req.body);
+    return successResponse(res, 200, 'Profil berhasil diperbarui.', { user });
+  } catch (err) {
+    next(err);
+  }
+};

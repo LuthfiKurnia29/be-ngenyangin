@@ -45,7 +45,10 @@ export const foodService = {
    * Membuat barang baru dengan validasi bisnis
    */
   async createFood(payload) {
-    const { name, description, harga, stock, category, image_url } = payload;
+    // FE mengirim discountPrice / image; tabel memakai harga / image_url
+    const harga = payload.harga ?? payload.discountPrice ?? payload.price;
+    const image_url = payload.image_url ?? payload.image;
+    const { name, description, stock, category } = payload;
 
     if (!name || name.trim() === '') {
       throw new AppError('Nama barang (name) wajib diisi.', 400);
@@ -54,6 +57,10 @@ export const foodService = {
     // if (price === undefined || price === null || isNaN(Number(price))) {
     //   throw new AppError('Harga barang (price) wajib diisi dengan angka valid.', 400);
     // }
+
+    if (harga === undefined || harga === null || harga === '' || isNaN(Number(harga))) {
+      throw new AppError('Harga barang wajib diisi dengan angka valid.', 400);
+    }
 
     if (Number(harga) < 0) {
       throw new AppError('Harga barang tidak boleh bernilai negatif.', 400);
@@ -65,6 +72,8 @@ export const foodService = {
       harga: parseFloat(harga),
       stock: stock !== undefined ? parseInt(stock, 10) : 0,
       is_empty: false,
+      category: category ? String(category).trim() : 'Umum',
+      image_url: image_url ? String(image_url).trim() : null,
     };
 
     if (newFoodData.stock < 0) {
@@ -81,7 +90,9 @@ export const foodService = {
     // 1. Verifikasi barang ada
     await this.getFoodById(id);
 
-    const { name, description, harga, stock, category, image_url } = payload;
+    const harga = payload.harga ?? payload.discountPrice ?? payload.price;
+    const image_url = payload.image_url ?? payload.image;
+    const { name, description, stock, category } = payload;
     const updateData = {};
 
     if (name !== undefined) {
@@ -109,13 +120,13 @@ export const foodService = {
       updateData.stock = parseInt(stock, 10);
     }
 
-    // if (category !== undefined) {
-    //   updateData.category = category ? category.trim() : 'Umum';
-    // }
+    if (category !== undefined) {
+      updateData.category = category ? String(category).trim() : 'Umum';
+    }
 
-    // if (image_url !== undefined) {
-    //   updateData.image_url = image_url ? image_url.trim() : null;
-    // }
+    if (image_url !== undefined) {
+      updateData.image_url = image_url ? String(image_url).trim() : null;
+    }
 
     if (Object.keys(updateData).length === 0) {
       throw new AppError('Tidak ada perubahan data yang dikirimkan.', 400);
