@@ -19,7 +19,8 @@
   "dependencies": {
     "@supabase/server": "^1.4.1",
     "@supabase/supabase-js": "^2.109.0",
-    "cors": "^2.8.5",
+    "axios": "^1.21.0",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
