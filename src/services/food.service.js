@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import { FoodModel } from '../models/food.model.js';
+import { CategoryModel } from '../models/category.model.js';
 import { AppError } from '../utils/errors.js';
 
 const assertOwner = (food, user) => {
@@ -35,6 +36,9 @@ const normalizeFoodPayload = (p = {}) => {
 
   const category = pick('category');
   if (category !== undefined) out.category = String(category).trim() || 'Makanan Berat';
+
+  const categoryId = toInt(pick('category_id', 'categoryId'), 'Category ID');
+  if (categoryId !== undefined) out.category_id = categoryId;
 
   const orig = toInt(pick('original_price', 'originalPrice'), 'Harga asli');
   if (orig !== undefined) out.original_price = orig;
@@ -128,6 +132,29 @@ export const foodService = {
       supplier_id: user?.id ?? data.supplier_id ?? null,
     };
 
+    // Sinkronisasi category dan category_id
+    if (newFood.category_id) {
+      try {
+        const cat = await CategoryModel.findById(newFood.category_id);
+        if (cat) {
+          newFood.category = cat.name;
+        } else {
+          throw new AppError(`Kategori dengan ID ${newFood.category_id} tidak ditemukan.`, 404);
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+      }
+    } else if (newFood.category) {
+      try {
+        const cat = await CategoryModel.findByName(newFood.category);
+        if (cat) {
+          newFood.category_id = cat.id;
+        }
+      } catch (_) {
+        // Fallback jika belum ada di tabel categories
+      }
+    }
+
     // Data toko diambil dari profil supplier (bukan dari input form)
     const prof = user?.profile;
     if (prof) {
@@ -156,6 +183,33 @@ export const foodService = {
     if (updateData.name === '') throw new AppError('Nama barang tidak boleh kosong.', 400);
     if (Object.keys(updateData).length === 0) {
       throw new AppError('Tidak ada perubahan data yang dikirimkan.', 400);
+    }
+
+    // Sinkronisasi category dan category_id jika diubah
+    if (updateData.category_id !== undefined) {
+      if (updateData.category_id === null) {
+        updateData.category_id = null;
+      } else {
+        try {
+          const cat = await CategoryModel.findById(updateData.category_id);
+          if (cat) {
+            updateData.category = cat.name;
+          } else {
+            throw new AppError(`Kategori dengan ID ${updateData.category_id} tidak ditemukan.`, 404);
+          }
+        } catch (err) {
+          if (err instanceof AppError) throw err;
+        }
+      }
+    } else if (updateData.category !== undefined) {
+      try {
+        const cat = await CategoryModel.findByName(updateData.category);
+        if (cat) {
+          updateData.category_id = cat.id;
+        }
+      } catch (_) {
+        // Fallback
+      }
     }
 
     if (updateData.original_price !== undefined || updateData.discount_price !== undefined) {

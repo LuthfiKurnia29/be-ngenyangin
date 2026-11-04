@@ -95,13 +95,22 @@ Buka file [database/seed.sql](file:///Users/maxindopro1215/Documents/College/Lom
 ### Public & Health
 - `GET /` : Root greeting
 - `GET /api/v1/health` : Health check status
-### Data Barang / Makanan (`/api/v1/foods` atau `/api/v1/barang`)
-- `GET /api/v1/foods` : Ambil daftar barang/makanan (mendukung query: `?search=...&category=...&limit=10&page=1`)
-- `GET /api/v1/foods/:id` : Ambil detail satu barang berdasarkan UUID
-- `POST /api/v1/foods` : Menambahkan data barang baru (body: `name`, `price`, `description`, `stock`, `category`, `image_url`)
-- `PUT /api/v1/foods/:id` : Memperbarui data barang berdasarkan UUID
-- `DELETE /api/v1/foods/:id` : Menghapus data barang berdasarkan UUID
-*(Catatan: Rute di atas juga dapat diakses menggunakan prefix `/api/v1/barang`)*
+
+### Kategori (`/api/v1/categories`)
+- `GET /api/v1/categories` : Ambil daftar kategori (mendukung query: `?search=...&sortBy=id&order=asc&limit=10&page=1`)
+- `GET /api/v1/categories/:id` : Ambil detail kategori berdasarkan ID
+- `POST /api/v1/categories` : Tambah kategori baru (Header: `Authorization: Bearer <token>`, body: `name`, `description`, `image_url`)
+- `PUT /api/v1/categories/:id` : Update kategori (Header: `Authorization: Bearer <token>`, body: `name`, `description`, `image_url`)
+- `DELETE /api/v1/categories/:id` : Hapus kategori (Header: `Authorization: Bearer <token>`)
+- `POST /api/v1/categories/upload` : Upload icon/gambar kategori (Header: `Authorization: Bearer <token>`, multipart field: `image`)
+
+### Data Barang / Produk (`/api/v1/products`)
+- `GET /api/v1/products` : Ambil daftar produk (mendukung query: `?search=...&category=...&category_id=...&limit=10&page=1`)
+- `GET /api/v1/products/:id` : Ambil detail satu produk berdasarkan ID
+- `POST /api/v1/products` : Menambahkan data produk baru (Header: `Authorization: Bearer <token>`, body: `name`, `discount_price` / `price`, `description`, `stock`, `categoryId` / `category_id`, `category`, `image_url`)
+- `PUT /api/v1/products/:id` : Memperbarui data produk (Header: `Authorization: Bearer <token>`, body: `name`, `discount_price`, `categoryId` / `category_id`, dll)
+- `DELETE /api/v1/products/:id` : Menghapus produk (Header: `Authorization: Bearer <token>`)
+- `POST /api/v1/products/upload` : Upload gambar produk (Header: `Authorization: Bearer <token>`, multipart field: `image`)
 
 ### Autentikasi & Sesi User
 - `POST /api/v1/auth/register` : Mendaftarkan akun user baru (body: `email`, `password`, `name`, `role`)

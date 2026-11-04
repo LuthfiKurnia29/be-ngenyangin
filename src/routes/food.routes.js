@@ -12,7 +12,7 @@ import { imageUpload } from '../middlewares/upload.js';
 
 const router = Router();
 
-// GET semua produk (filter: category, search, supplier_id, limit, page)
+// GET semua produk (filter: category, category_id, search, supplier_id, limit, page)
 router.get('/', getAllFoods);
 
 // POST upload gambar (harus sebelum '/:id')

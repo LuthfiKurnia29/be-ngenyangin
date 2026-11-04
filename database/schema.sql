@@ -18,6 +18,24 @@ CREATE TABLE public.cache_locks (
     expiration bigint NOT NULL
 );
 
+CREATE TABLE public.categories (
+    id bigint NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    image_url text,
+    created_at timestamp(0) without time zone DEFAULT now(),
+    updated_at timestamp(0) without time zone DEFAULT now()
+);
+
+CREATE SEQUENCE public.categories_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.categories_id_seq OWNED BY public.categories.id;
+
 CREATE TABLE public.detail_purchases (
     id bigint NOT NULL,
     purchase_id bigint NOT NULL,
@@ -153,6 +171,7 @@ CREATE TABLE public.products (
     is_active boolean DEFAULT true NOT NULL,
     address text,
     tags text[] DEFAULT '{}'::text[] NOT NULL,
+    category_id bigint,
     CONSTRAINT products_discount_check CHECK (((discount >= 0) AND (discount <= 100))),
     CONSTRAINT products_discount_price_check CHECK ((discount_price >= 0)),
     CONSTRAINT products_original_price_check CHECK ((original_price >= 0)),
@@ -240,6 +259,8 @@ CREATE SEQUENCE public.users_id_seq
 
 ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
+ALTER TABLE ONLY public.categories ALTER COLUMN id SET DEFAULT nextval('public.categories_id_seq'::regclass);
+
 ALTER TABLE ONLY public.detail_purchases ALTER COLUMN id SET DEFAULT nextval('public.detail_purchases_id_seq'::regclass);
 
 ALTER TABLE ONLY public.failed_jobs ALTER COLUMN id SET DEFAULT nextval('public.failed_jobs_id_seq'::regclass);
@@ -261,6 +282,12 @@ ALTER TABLE ONLY public.cache_locks
 
 ALTER TABLE ONLY public.cache
     ADD CONSTRAINT cache_pkey PRIMARY KEY (key);
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_name_unique UNIQUE (name);
 
 ALTER TABLE ONLY public.detail_purchases
     ADD CONSTRAINT detail_purchases_pkey PRIMARY KEY (id);
@@ -312,7 +339,11 @@ CREATE INDEX failed_jobs_connection_queue_failed_at_index ON public.failed_jobs 
 
 CREATE INDEX jobs_queue_index ON public.jobs USING btree (queue);
 
+CREATE INDEX categories_name_idx ON public.categories USING btree (name);
+
 CREATE INDEX products_category_idx ON public.products USING btree (category);
+
+CREATE INDEX products_category_id_idx ON public.products USING btree (category_id);
 
 CREATE INDEX products_supplier_idx ON public.products USING btree (supplier_id);
 
@@ -323,6 +354,8 @@ CREATE INDEX purchases_supplier_idx ON public.purchases USING btree (supplier_id
 CREATE INDEX sessions_last_activity_index ON public.sessions USING btree (last_activity);
 
 CREATE INDEX sessions_user_id_index ON public.sessions USING btree (user_id);
+
+CREATE TRIGGER categories_updated BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 CREATE TRIGGER products_updated BEFORE UPDATE ON public.products FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
@@ -341,6 +374,9 @@ ALTER TABLE ONLY public.log_purchases
 
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.products
+    ADD CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE SET NULL;
 
 ALTER TABLE ONLY public.purchases
     ADD CONSTRAINT purchases_courier_id_fkey FOREIGN KEY (courier_id) REFERENCES public.users(id) ON DELETE SET NULL;

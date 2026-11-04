@@ -1,56 +1,101 @@
 import { supabase } from '../config/supabase.js';
 
-// Sertakan data supplier (tabel users) supaya katalog menampilkan nama toko & alamat dari supplier.
+// Sertakan data supplier dan kategori (tabel users dan categories)
 const WITH_SUPPLIER = '*, supplier:users!supplier_id(id, name, outlet, address, phone, avatar)';
+const WITH_RELATIONS = '*, supplier:users!supplier_id(id, name, outlet, address, phone, avatar), category_detail:categories!category_id(id, name, description, image_url)';
+
+const formatFood = (food) => {
+  if (!food) return food;
+  return {
+    ...food,
+    category_id: food.category_id ?? food.category_detail?.id ?? null,
+    category_detail: food.category_detail || null,
+  };
+};
 
 export const FoodModel = {
   /**
    * Mengambil semua data barang / makanan dengan opsi query
    */
-  async findAll({ search, category, supplier_id, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
-    let query = supabase.from('products').select(WITH_SUPPLIER, { count: 'exact' });
+  async findAll({ search, category, category_id, categoryId, supplier_id, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
+    const buildQuery = (selectStr) => {
+      let query = supabase.from('products').select(selectStr, { count: 'exact' });
 
-    if (category) {
-      query = query.ilike('category', `%${category}%`);
+      const catId = category_id || categoryId;
+      if (catId) {
+        query = query.eq('category_id', catId);
+      } else if (category) {
+        // Mendukung filter id kategori numerik atau nama kategori
+        if (!isNaN(category) && Number(category) > 0) {
+          query = query.eq('category_id', Number(category));
+        } else {
+          query = query.ilike('category', `%${category}%`);
+        }
+      }
+
+      if (supplier_id) {
+        query = query.eq('supplier_id', supplier_id);
+      }
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+
+      const isAscending = String(order).toLowerCase() === 'asc';
+      query = query.order(sortBy, { ascending: isAscending });
+
+      if (limit) {
+        const parsedLimit = parseInt(limit, 10);
+        const parsedPage = parseInt(page, 10) || 1;
+        const from = (parsedPage - 1) * parsedLimit;
+        const to = from + parsedLimit - 1;
+        query = query.range(from, to);
+      }
+
+      return query;
+    };
+
+    let { data, error, count } = await buildQuery(WITH_RELATIONS);
+
+    // Fallback jika relasi category_id belum tersedia di Supabase sebelum migrasi dijalankan
+    if (error && (error.message?.includes('categories') || error.code === 'PGRST200')) {
+      const fallback = await buildQuery(WITH_SUPPLIER);
+      if (fallback.error) throw fallback.error;
+      data = fallback.data;
+      count = fallback.count;
+    } else if (error) {
+      throw error;
     }
 
-    if (supplier_id) {
-      query = query.eq('supplier_id', supplier_id);
-    }
-
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-
-    const isAscending = order.toLowerCase() === 'asc';
-    query = query.order(sortBy, { ascending: isAscending });
-
-    if (limit) {
-      const parsedLimit = parseInt(limit, 10);
-      const parsedPage = parseInt(page, 10) || 1;
-      const from = (parsedPage - 1) * parsedLimit;
-      const to = from + parsedLimit - 1;
-      query = query.range(from, to);
-    }
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    return { data, count };
+    return {
+      data: Array.isArray(data) ? data.map(formatFood) : data,
+      count,
+    };
   },
 
   /**
    * Mengambil satu data barang berdasarkan ID
    */
   async findById(id) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('products')
-      .select(WITH_SUPPLIER)
+      .select(WITH_RELATIONS)
       .eq('id', id)
       .maybeSingle();
 
-    if (error) throw error;
-    return data;
+    if (error && (error.message?.includes('categories') || error.code === 'PGRST200')) {
+      const fallback = await supabase
+        .from('products')
+        .select(WITH_SUPPLIER)
+        .eq('id', id)
+        .maybeSingle();
+      if (fallback.error) throw fallback.error;
+      data = fallback.data;
+    } else if (error) {
+      throw error;
+    }
+
+    return formatFood(data);
   },
 
   /**
@@ -64,7 +109,7 @@ export const FoodModel = {
       .single();
 
     if (error) throw error;
-    return data;
+    return formatFood(data);
   },
 
   /**
@@ -79,7 +124,7 @@ export const FoodModel = {
       .single();
 
     if (error) throw error;
-    return data;
+    return formatFood(data);
   },
 
   /**
@@ -97,4 +142,3 @@ export const FoodModel = {
     return data;
   },
 };
-

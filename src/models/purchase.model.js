@@ -52,6 +52,24 @@ export const PurchaseModel = {
             .single();
 
         if (error) throw error;
+
+        if (purchaseData.length > 1) {
+            for (const item of purchaseData) {
+                await supabase
+                    .from('detail_purchases')
+                    .insert({
+                        purchase_id: data.id,
+                        product_id: purchaseData.productId,
+                        jumlah: purchaseData.jumlah,
+                        // priceQty: 
+                    })
+                    .select()
+                    .single();
+            }
+        }
+
+        if (detailError) throw detailError;
+
         return data;
     },
 

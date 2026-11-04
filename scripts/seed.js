@@ -2,16 +2,30 @@ import { config } from '../src/config/env.js';
 import { supabase } from '../src/config/supabase.js';
 
 // Data awal lengkap ada di database/seed.sql (disalin dari data FE).
-// Skrip ini hanya seed ringan: user admin + beberapa produk contoh.
+// Skrip ini hanya seed ringan: user admin, kategori contoh, + beberapa produk contoh.
 const seedUsers = [
   { name: 'Admin NGENYANGIN', email: 'admin@demo.id', role: 'admin', phone: '021-5555-0000' },
-  { name: 'Ahmad Fauzan', email: 'supplier@demo.id', role: 'supplier', outlet: 'Bebek Madura Bu Siti',
-    address: 'Jl. Tebet Raya No. 42, Jakarta Selatan' },
+  {
+    name: 'Ahmad Fauzan',
+    email: 'supplier@demo.id',
+    role: 'supplier',
+    outlet: 'Bebek Madura Bu Siti',
+    address: 'Jl. Tebet Raya No. 42, Jakarta Selatan',
+  },
 ];
 
-const seedFoods = (supplier) => [
+const seedCategories = [
+  { name: 'Makanan Berat', description: 'Nasi, mie, lauk pauk, dan menu makanan utama' },
+  { name: 'Makanan Ringan', description: 'Camilan, gorengan, kue basah, dan kudapan' },
+  { name: 'Minuman', description: 'Kopi, teh, jus, dan aneka minuman segar' },
+  { name: 'Roti & Pastry', description: 'Roti, donat, pastry, dan aneka bakery' },
+  { name: 'Sayur & Buah', description: 'Produk segar sayuran dan buah-buahan' },
+];
+
+const seedFoods = (supplier, categoryMap = {}) => [
   {
     supplier_id: supplier.id,
+    category_id: categoryMap['Makanan Berat'] || null,
     name: 'Paket Nasi Bebek Madura Bumbu Hitam',
     description: 'Nasi bebek bumbu hitam khas Madura dengan sambal terasi dan lalapan.',
     category: 'Makanan Berat',
@@ -50,12 +64,30 @@ async function runSeed() {
     }
     console.log(`✅ Berhasil memasukkan ${usersData?.length || 0} user.`);
 
-    // 2. Seed Foods
+    // 2. Seed Categories (upsert berdasarkan name)
+    console.log('🏷️  Seeding tabel `categories`...');
+    let categoryMap = {};
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .upsert(seedCategories, { onConflict: 'name' })
+      .select();
+
+    if (categoriesError) {
+      console.warn(`⚠️  Peringatan seeding categories: ${categoriesError.message} (lewatkan jika belum migrasi)`);
+    } else {
+      console.log(`✅ Berhasil memasukkan ${categoriesData?.length || 0} kategori.`);
+      categoryMap = (categoriesData || []).reduce((acc, cat) => {
+        acc[cat.name] = cat.id;
+        return acc;
+      }, {});
+    }
+
+    // 3. Seed Foods
     console.log('🍔 Seeding tabel `products`...');
     const supplier = usersData.find((u) => u.role === 'supplier');
     const { data: foodsData, error: foodsError } = await supabase
       .from('products')
-      .insert(seedFoods(supplier))
+      .insert(seedFoods(supplier, categoryMap))
       .select();
 
     if (foodsError) {
@@ -73,4 +105,3 @@ async function runSeed() {
 }
 
 runSeed();
-
