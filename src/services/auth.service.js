@@ -2,6 +2,12 @@ import { supabase } from '../config/supabase.js';
 import { config } from '../config/env.js';
 import { UserModel } from '../models/user.model.js';
 import { AppError } from '../utils/errors.js';
+import {
+  hashMD5,
+  compareMD5,
+  generateSessionToken,
+  verifySessionToken,
+} from '../utils/crypto.js';
 
 const toProfile = (profile, fallback = {}) => ({
   id: profile?.id ?? fallback.id ?? null,
@@ -13,6 +19,10 @@ const toProfile = (profile, fallback = {}) => ({
   gender: profile?.gender || null,
   outlet: profile?.outlet || '',
   description: profile?.description || '',
+  vehicle: profile?.vehicle || null,
+  radius: profile?.radius || null,
+  bag_status: profile?.bag_status || null,
+  rating: profile?.rating || null,
   avatar: profile?.avatar || null,
   created_at: profile?.created_at,
 });
@@ -30,70 +40,96 @@ export const authService = {
       throw new AppError('Password minimal harus 6 karakter.', 400);
     }
 
-    if (!['consumer', 'supplier'].includes(role)) {
-      throw new AppError('Peran hanya boleh consumer atau supplier.', 400);
+    const allowedRoles = ['consumer', 'supplier', 'courier', 'admin'];
+    if (!allowedRoles.includes(role)) {
+      throw new AppError('Peran tidak valid.', 400);
+    }
+
+    const existingUser = await UserModel.findByEmail(email).catch(() => null);
+    if (existingUser) {
+      throw new AppError('Email sudah terdaftar. Silakan gunakan email lain atau login.', 400);
     }
 
     const userName = name || email.split('@')[0];
+    const hashedPassword = hashMD5(password);
 
-    // 1. Daftarkan user ke Supabase Auth.
-    // Jika service role key tersedia, buat user via Admin API dengan email_confirm: true
-    // supaya akun langsung terkonfirmasi (FE melakukan login otomatis setelah daftar).
-    // Tanpa service role key, fallback ke signUp biasa (butuh "Confirm email" dimatikan di dashboard).
-    const userMeta = { name: userName, role };
-    const { data: authData, error: authError } = config.supabase.serviceRoleKey && supabase.auth.admin?.createUser
-      ? await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: userMeta,
-        })
-      : await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: userMeta },
-        });
+    // 1. Coba daftarkan user ke Supabase Auth (opsional/fail-safe)
+    let authUser = null;
+    let authSession = null;
+    try {
+      const userMeta = { name: userName, role };
+      const { data: authData, error: authError } =
+        config.supabase.serviceRoleKey && supabase.auth.admin?.createUser
+          ? await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: userMeta,
+          })
+          : await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: userMeta },
+          });
 
-    if (authError) {
-      throw new AppError(authError.message, 400);
+      if (!authError && authData?.user) {
+        authUser = authData.user;
+        authSession = authData.session;
+      }
+    } catch (err) {
+      console.warn('Registrasi Supabase Auth dilewati/gagal:', err.message);
     }
 
-    const authUser = authData.user;
-    if (!authUser) {
-      throw new AppError('Gagal membuat akun.', 400);
-    }
-
-    // 2. Simpan profil ke tabel users via UserModel
+    // 2. Simpan profil ke tabel users via UserModel dengan password MD5
     let profile = null;
     try {
       profile = await UserModel.upsert({
         name: userName,
         email,
+        password: hashedPassword,
         role,
         phone: phone || null,
         gender: role === 'consumer' && ['male', 'female'].includes(gender) ? gender : null,
       });
     } catch (err) {
       console.warn('Gagal menyimpan profil user ke tabel users:', err.message);
+      throw new AppError(`Gagal mendaftarkan user ke database: ${err.message}`, 500);
     }
+
+    const userId = profile?.id ?? null;
+    const sessionToken =
+      authSession?.access_token ||
+      generateSessionToken({
+        id: userId,
+        email,
+        role: profile?.role || role,
+      });
 
     return {
       user: {
-        id: profile?.id ?? null,
-        auth_id: authUser.id,
+        id: userId,
+        auth_id: authUser?.id || (userId ? String(userId) : null),
         name: profile?.name || userName,
-        email: authUser.email,
+        email: profile?.email || email,
         role: profile?.role || role,
-        created_at: profile?.created_at || authUser.created_at,
+        phone: profile?.phone || '',
+        address: profile?.address || '',
+        gender: profile?.gender || null,
+        outlet: profile?.outlet || '',
+        description: profile?.description || '',
+        vehicle: profile?.vehicle || null,
+        radius: profile?.radius || null,
+        bag_status: profile?.bag_status || null,
+        rating: profile?.rating || null,
+        avatar: profile?.avatar || null,
+        created_at: profile?.created_at || authUser?.created_at || new Date().toISOString(),
       },
-      session: authData.session
-        ? {
-            access_token: authData.session.access_token,
-            refresh_token: authData.session.refresh_token,
-            expires_in: authData.session.expires_in,
-            token_type: authData.session.token_type,
-          }
-        : null,
+      session: {
+        access_token: sessionToken,
+        refresh_token: authSession?.refresh_token || sessionToken,
+        expires_in: authSession?.expires_in || 7 * 24 * 3600,
+        token_type: 'bearer',
+      },
     };
   },
 
@@ -105,54 +141,80 @@ export const authService = {
       throw new AppError('Email dan password wajib diisi.', 400);
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    // 1. Ambil data user dari database berdasarkan email
+    const user = await UserModel.findByEmail(email).catch(() => null);
+    if (!user) {
+      throw new AppError('Email atau password salah.', 401);
+    }
+
+    // 2. Verifikasi hash MD5 password
+    const hashedPassword = hashMD5(password);
+    let isMatch = Boolean(user.password && user.password === hashedPassword);
+    let supabaseSession = null;
+    let supabaseUser = null;
+
+    // Fallback: Jika di DB belum tersimpan password (atau hash belum MD5),
+    // coba validasi via Supabase Auth jika tersedia, lalu simpan hash MD5-nya
+    if (!isMatch) {
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (!authError && authData?.user) {
+          isMatch = true;
+          supabaseUser = authData.user;
+          supabaseSession = authData.session;
+          // Sinkronisasi hash MD5 ke tabel users
+          await UserModel.update(user.id, { password: hashedPassword }).catch(() => null);
+        }
+      } catch {
+        // Abaikan error Supabase
+      }
+    }
+
+    if (!isMatch) {
+      throw new AppError('Email atau password salah.', 401);
+    }
+
+    // 3. Generate session token jika tidak ada sesi Supabase
+    const sessionToken = generateSessionToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
     });
 
-    if (authError) {
-      const message =
-        authError.message === 'Invalid login credentials'
-          ? 'Email atau password salah.'
-          : authError.message;
-      throw new AppError(message, 401);
-    }
-
-    const { user, session } = authData;
-
-    // Ambil data profil dari database
-    let profile = await UserModel.findByEmail(email).catch(() => null);
-    if (!profile) {
-      // akun Auth sudah ada tapi belum punya baris di tabel users -> buatkan
-      profile = await UserModel.upsert({
-        name: user.user_metadata?.name || email.split('@')[0],
-        email,
-        role: user.user_metadata?.role || 'consumer',
-      }).catch(() => null);
-    }
+    const accessToken = supabaseSession?.access_token || sessionToken;
+    const refreshToken = supabaseSession?.refresh_token || sessionToken;
+    const expiresIn = supabaseSession?.expires_in || 7 * 24 * 3600;
 
     const userData = {
-      id: profile?.id ?? null,
-      auth_id: user.id,
-      name: profile?.name || user.user_metadata?.name || email.split('@')[0],
+      id: user.id,
+      auth_id: supabaseUser?.id || String(user.id),
+      name: user.name || email.split('@')[0],
       email: user.email,
-      role: profile?.role || user.user_metadata?.role || 'consumer',
-      phone: profile?.phone || '',
-      address: profile?.address || '',
-      gender: profile?.gender || null,
-      outlet: profile?.outlet || '',
-      description: profile?.description || '',
-      avatar: profile?.avatar || null,
-      created_at: profile?.created_at || user.created_at,
+      role: user.role || 'consumer',
+      phone: user.phone || '',
+      address: user.address || '',
+      gender: user.gender || null,
+      outlet: user.outlet || '',
+      description: user.description || '',
+      vehicle: user.vehicle || null,
+      radius: user.radius || null,
+      bag_status: user.bag_status || null,
+      rating: user.rating || null,
+      avatar: user.avatar || null,
+      created_at: user.created_at,
     };
 
     return {
       user: userData,
       session: {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_in: session.expires_in,
-        token_type: session.token_type,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_in: expiresIn,
+        token_type: 'bearer',
       },
     };
   },
@@ -160,7 +222,7 @@ export const authService = {
   /**
    * Update profil user yang sedang login (nama, no. HP, alamat)
    */
-  async updateProfile(currentUser, { name, phone, address, gender, outlet, description, avatar }) {
+  async updateProfile(currentUser, { name, phone, address, gender, outlet, description, avatar, vehicle, radius, bag_status }) {
     const updateData = {};
 
     if (name !== undefined) {
@@ -189,11 +251,18 @@ export const authService = {
       updateData.gender = gender || null;
     }
 
-    // Data toko hanya untuk supplier
+    // Data spesifik supplier
     const role = currentUser.profile?.role;
     if (role === 'supplier') {
       if (outlet !== undefined) updateData.outlet = String(outlet).trim() || null;
       if (description !== undefined) updateData.description = String(description).trim() || null;
+    }
+
+    // Data spesifik kurir
+    if (role === 'courier') {
+      if (vehicle !== undefined) updateData.vehicle = String(vehicle).trim() || null;
+      if (radius !== undefined) updateData.radius = Number(radius) || null;
+      if (bag_status !== undefined) updateData.bag_status = String(bag_status).trim() || null;
     }
 
     if (avatar !== undefined) {
@@ -207,16 +276,14 @@ export const authService = {
       throw new AppError('Tidak ada perubahan data yang dikirimkan.', 400);
     }
 
-    // Profil sudah ada -> UPDATE biasa (tidak menyentuh kolom lain / constraint NOT NULL).
-    // Belum ada -> buat baris baru.
     const profile = currentUser.id
       ? await UserModel.update(currentUser.id, updateData)
       : await UserModel.upsert({
-          email: currentUser.email,
-          name: currentUser.profile?.name || currentUser.email.split('@')[0],
-          role: currentUser.profile?.role || 'consumer',
-          ...updateData,
-        });
+        email: currentUser.email,
+        name: currentUser.profile?.name || currentUser.email.split('@')[0],
+        role: currentUser.profile?.role || 'consumer',
+        ...updateData,
+      });
 
     return toProfile(profile, { id: currentUser.id, email: currentUser.email });
   },
@@ -247,25 +314,46 @@ export const authService = {
       throw new AppError('Token autentikasi tidak ditemukan.', 401);
     }
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      throw new AppError('Sesi tidak valid atau telah kedaluwarsa. Silakan login kembali.', 401);
+    // 1. Verifikasi dengan internal JWT token terlebih dahulu
+    const jwtPayload = verifySessionToken(token);
+    if (jwtPayload && jwtPayload.email) {
+      const user = await UserModel.findByEmail(jwtPayload.email).catch(() => null);
+      if (user) {
+        const { password, ...safeProfile } = user;
+        return {
+          id: user.id,
+          authId: String(user.id),
+          email: user.email,
+          phone: user.phone,
+          metadata: { name: user.name, role: user.role },
+          profile: safeProfile,
+        };
+      }
     }
 
-    const profile = await UserModel.findByEmail(user.email).catch(() => null);
+    // 2. Fallback: Verifikasi token via Supabase Auth jika token adalah Supabase JWT
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (!error && user) {
+        const profile = await UserModel.findByEmail(user.email).catch(() => null);
+        const { password, ...safeProfile } = profile || {};
+        return {
+          id: profile?.id ?? null,
+          authId: user.id,
+          email: user.email,
+          phone: user.phone,
+          metadata: user.user_metadata,
+          profile: safeProfile || {
+            name: user.user_metadata?.name || user.email?.split('@')[0],
+            role: user.user_metadata?.role || 'consumer',
+          },
+        };
+      }
+    } catch {
+      // Abaikan error Supabase dan lempar AppError di bawah
+    }
 
-    return {
-      id: profile?.id ?? null,
-      authId: user.id,
-      email: user.email,
-      phone: user.phone,
-      metadata: user.user_metadata,
-      profile: profile || {
-        name: user.user_metadata?.name || user.email?.split('@')[0],
-        role: user.user_metadata?.role || 'consumer',
-      },
-    };
+    throw new AppError('Sesi tidak valid atau telah kedaluwarsa. Silakan login kembali.', 401);
   },
 
   /**

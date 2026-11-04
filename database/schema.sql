@@ -233,6 +233,7 @@ CREATE TABLE public.users (
     id bigint NOT NULL,
     name character varying(255) NOT NULL,
     email character varying(255) NOT NULL,
+    password character varying(255),
     phone character varying(255),
     role character varying(255) DEFAULT 'consumer'::character varying NOT NULL,
     created_at timestamp(0) without time zone,

@@ -1,16 +1,50 @@
 import { config } from '../src/config/env.js';
 import { supabase } from '../src/config/supabase.js';
+import { hashMD5 } from '../src/utils/crypto.js';
 
-// Data awal lengkap ada di database/seed.sql (disalin dari data FE).
-// Skrip ini hanya seed ringan: user admin, kategori contoh, + beberapa produk contoh.
+// Default password untuk semua akun seed: password123
+const defaultPasswordHash = hashMD5('password123');
+
+// Data awal pengguna untuk semua role (admin, supplier, consumer, courier)
 const seedUsers = [
-  { name: 'Admin NGENYANGIN', email: 'admin@demo.id', role: 'admin', phone: '021-5555-0000' },
+  {
+    name: 'Admin NGENYANGIN',
+    email: 'admin@demo.id',
+    password: defaultPasswordHash,
+    role: 'admin',
+    phone: '021-5555-0000',
+    address: 'Kantor Pusat Ngenyangin, Jakarta',
+  },
   {
     name: 'Ahmad Fauzan',
     email: 'supplier@demo.id',
+    password: defaultPasswordHash,
     role: 'supplier',
+    phone: '081234567891',
     outlet: 'Bebek Madura Bu Siti',
+    description: 'Menyediakan olahan bebek empuk bumbu hitam khas Madura.',
     address: 'Jl. Tebet Raya No. 42, Jakarta Selatan',
+  },
+  {
+    name: 'Budi Santoso',
+    email: 'consumer@demo.id',
+    password: defaultPasswordHash,
+    role: 'consumer',
+    phone: '081234567892',
+    gender: 'male',
+    address: 'Jl. Sudirman No. 10, Jakarta Pusat',
+  },
+  {
+    name: 'Kurir Kilat',
+    email: 'courier@demo.id',
+    password: defaultPasswordHash,
+    role: 'courier',
+    phone: '081298765432',
+    vehicle: 'Honda Vario 160',
+    radius: 10.0,
+    bag_status: 'ready',
+    rating: 4.9,
+    address: 'Jl. Gatot Subroto No. 88, Jakarta Selatan',
   },
 ];
 

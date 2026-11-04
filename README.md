@@ -113,7 +113,16 @@ Buka file [database/seed.sql](file:///Users/maxindopro1215/Documents/College/Lom
 - `POST /api/v1/products/upload` : Upload gambar produk (Header: `Authorization: Bearer <token>`, multipart field: `image`)
 
 ### Autentikasi & Sesi User
-- `POST /api/v1/auth/register` : Mendaftarkan akun user baru (body: `email`, `password`, `name`, `role`)
+- `POST /api/v1/auth/register` : Mendaftarkan akun user baru (body: `email`, `password`, `name`, `role` [consumer|supplier])
 - `POST /api/v1/auth/login` : Login user dengan email dan password (body: `email`, `password`)
 - `POST /api/v1/auth/logout` : Logout user / invalidate session
 - `GET /api/v1/auth/me` : Mendapatkan data user & session aktif (Header: `Authorization: Bearer <access_token>`)
+
+#### 🔑 Akun Demo (Default Password: `password123`)
+Password disimpan di database dengan hash MD5.
+| Role | Email | Password | Keterangan |
+|---|---|---|---|
+| Admin | `admin@demo.id` | `password123` | Akses penuh sistem |
+| Supplier | `supplier@demo.id` | `password123` | Penjual makanan (Bebek Madura Bu Siti) |
+| Consumer | `consumer@demo.id` | `password123` | Pembeli makanan (Budi Santoso) |
+| Courier | `courier@demo.id` | `password123` | Kurir pengantaran (Kurir Kilat) |
