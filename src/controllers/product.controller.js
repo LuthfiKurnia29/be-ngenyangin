@@ -33,7 +33,7 @@ export const getFoodById = async (req, res, next) => {
  */
 export const createFood = async (req, res, next) => {
   try {
-    const data = await foodService.createFood(req.body);
+    const data = await foodService.createFood(req.body, req.user);
     return successResponse(res, 201, 'Berhasil menambahkan barang baru.', data);
   } catch (err) {
     next(err);
@@ -46,7 +46,7 @@ export const createFood = async (req, res, next) => {
  */
 export const updateFood = async (req, res, next) => {
   try {
-    const data = await foodService.updateFood(req.params.id, req.body);
+    const data = await foodService.updateFood(req.params.id, req.body, req.user);
     return successResponse(res, 200, 'Berhasil memperbarui data barang.', data);
   } catch (err) {
     next(err);
@@ -59,8 +59,21 @@ export const updateFood = async (req, res, next) => {
  */
 export const deleteFood = async (req, res, next) => {
   try {
-    const data = await foodService.deleteFood(req.params.id);
+    const data = await foodService.deleteFood(req.params.id, req.user);
     return successResponse(res, 200, 'Berhasil menghapus data barang.', data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Upload gambar produk ke Supabase Storage (bucket: product-images)
+ * POST /api/v1/products/upload  (multipart/form-data, field: image)
+ */
+export const uploadFoodImage = async (req, res, next) => {
+  try {
+    const data = await foodService.uploadImage(req.file, req.user);
+    return successResponse(res, 201, 'Berhasil mengunggah gambar.', data);
   } catch (err) {
     next(err);
   }

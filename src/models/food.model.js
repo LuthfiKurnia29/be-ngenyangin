@@ -1,14 +1,21 @@
 import { supabase } from '../config/supabase.js';
 
+// Sertakan data supplier (tabel users) supaya katalog menampilkan nama toko & alamat dari supplier.
+const WITH_SUPPLIER = '*, supplier:users!supplier_id(id, name, outlet, address, phone, avatar)';
+
 export const FoodModel = {
   /**
    * Mengambil semua data barang / makanan dengan opsi query
    */
-  async findAll({ search, category, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
-    let query = supabase.from('products').select('*', { count: 'exact' });
+  async findAll({ search, category, supplier_id, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
+    let query = supabase.from('products').select(WITH_SUPPLIER, { count: 'exact' });
 
     if (category) {
       query = query.ilike('category', `%${category}%`);
+    }
+
+    if (supplier_id) {
+      query = query.eq('supplier_id', supplier_id);
     }
 
     if (search) {
@@ -38,7 +45,7 @@ export const FoodModel = {
   async findById(id) {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(WITH_SUPPLIER)
       .eq('id', id)
       .maybeSingle();
 
