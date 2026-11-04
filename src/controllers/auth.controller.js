@@ -48,8 +48,17 @@ export const logout = async (req, res, next) => {
  */
 export const getMe = async (req, res, next) => {
   try {
+    // ratakan profil supaya FE langsung dapat name, phone, address, role, dst.
+    const { profile, ...session } = req.user;
     return successResponse(res, 200, 'Berhasil mengambil data sesi user.', {
-      user: req.user,
+      user: {
+        ...profile,
+        id: session.id,
+        auth_id: session.authId,
+        email: session.email,
+        phone: profile?.phone || '',
+        address: profile?.address || '',
+      },
     });
   } catch (err) {
     next(err);
@@ -64,6 +73,19 @@ export const updateProfile = async (req, res, next) => {
   try {
     const user = await authService.updateProfile(req.user, req.body);
     return successResponse(res, 200, 'Profil berhasil diperbarui.', { user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Upload foto profil ke Supabase Storage (bucket: avatars)
+ * POST /api/v1/auth/avatar  (multipart/form-data, field: image)
+ */
+export const uploadAvatar = async (req, res, next) => {
+  try {
+    const data = await authService.uploadAvatar(req.file, req.user);
+    return successResponse(res, 201, 'Berhasil mengunggah foto profil.', data);
   } catch (err) {
     next(err);
   }

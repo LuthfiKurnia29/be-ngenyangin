@@ -1,56 +1,31 @@
 import { config } from '../src/config/env.js';
 import { supabase } from '../src/config/supabase.js';
 
+// Data awal lengkap ada di database/seed.sql (disalin dari data FE).
+// Skrip ini hanya seed ringan: user admin + beberapa produk contoh.
 const seedUsers = [
-  {
-    name: 'Admin Ngenyangin',
-    email: 'admin@ngenyangin.id',
-    role: 'admin',
-  },
-  {
-    name: 'Budi Santoso',
-    email: 'budi@gmail.com',
-    role: 'customer',
-  },
-  {
-    name: 'Siti Rahma',
-    email: 'siti@gmail.com',
-    role: 'customer',
-  },
+  { name: 'Admin NGENYANGIN', email: 'admin@demo.id', role: 'admin', phone: '021-5555-0000' },
+  { name: 'Ahmad Fauzan', email: 'supplier@demo.id', role: 'supplier', outlet: 'Bebek Madura Bu Siti',
+    address: 'Jl. Tebet Raya No. 42, Jakarta Selatan' },
 ];
 
-const seedFoods = [
+const seedFoods = (supplier) => [
   {
-    name: 'Nasi Goreng Spesial',
-    description: 'Nasi goreng dengan telur, suwir ayam, dan acar segar',
-    harga: 25000,
-    stock: 50,
+    supplier_id: supplier.id,
+    name: 'Paket Nasi Bebek Madura Bumbu Hitam',
+    description: 'Nasi bebek bumbu hitam khas Madura dengan sambal terasi dan lalapan.',
     category: 'Makanan Berat',
+    original_price: 35000,
+    discount_price: 18000,
+    discount: 49,
+    stock: 5,
+    pickup_deadline: '20:00',
     image_url: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b',
-  },
-  {
-    name: 'Ayam Bakar Madu',
-    description: 'Ayam panggang bumbu madu khas Nusantara',
-    harga: 32000,
-    stock: 30,
-    category: 'Makanan Berat',
-    image_url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b',
-  },
-  {
-    name: 'Es Teh Manis',
-    description: 'Teh melati manis segar dingin',
-    harga: 5000,
-    stock: 100,
-    category: 'Minuman',
-    image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc',
-  },
-  {
-    name: 'Pisang Goreng Crispy',
-    description: 'Pisang raja goreng tepung renyah dengan topping keju cokelat',
-    harga: 18000,
-    stock: 40,
-    category: 'Camilan',
-    image_url: 'https://images.unsplash.com/photo-1528751014936-863e6e7a319c',
+    safety_approved: true,
+    supplier_name: supplier.outlet,
+    outlet: 'Tebet, Jakarta Selatan',
+    address: supplier.address,
+    tags: ['Nasi', 'Bebek'],
   },
 ];
 
@@ -77,9 +52,10 @@ async function runSeed() {
 
     // 2. Seed Foods
     console.log('🍔 Seeding tabel `products`...');
+    const supplier = usersData.find((u) => u.role === 'supplier');
     const { data: foodsData, error: foodsError } = await supabase
       .from('products')
-      .upsert(seedFoods, { onConflict: 'name' })
+      .insert(seedFoods(supplier))
       .select();
 
     if (foodsError) {
