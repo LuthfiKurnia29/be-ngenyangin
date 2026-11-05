@@ -361,16 +361,32 @@ export const authService = {
    */
   async uploadAvatar(file, user) {
     if (!file) throw new AppError('File gambar (field "image") wajib dikirim.', 400);
+    if (!config.supabase.url || (!config.supabase.serviceRoleKey && !config.supabase.anonKey)) {
+      throw new AppError('Konfigurasi Supabase belum tersedia untuk upload foto profil.', 500);
+    }
     const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.mimetype];
     if (!ext) throw new AppError('Format gambar harus JPG, PNG, atau WebP.', 400);
 
-    const path = `${user?.id || 'anon'}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
+    const userId = user?.id || user?.profile?.id;
+    if (!userId) throw new AppError('Identitas pengguna tidak ditemukan.', 401);
+
+    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-    if (error) throw new AppError(`Gagal mengunggah foto: ${error.message}`, 500);
+    if (uploadError) {
+      const message = uploadError.message?.toLowerCase().includes('bucket not found')
+        ? 'Bucket avatars belum tersedia. Jalankan migration_profil.sql di Supabase.'
+        : `Gagal mengunggah foto: ${uploadError.message}`;
+      throw new AppError(message, 500);
+    }
 
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    if (!data?.publicUrl) throw new AppError('URL foto profil tidak berhasil dibuat.', 500);
+
+    const { error: profileError } = await UserModel.update(userId, { avatar: data.publicUrl });
+    if (profileError) throw new AppError(`Foto berhasil diunggah tetapi gagal menyimpan profil: ${profileError.message}`, 500);
+
     return { avatar_url: data.publicUrl, path };
   },
 };
