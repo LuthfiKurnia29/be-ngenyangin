@@ -1,14 +1,33 @@
 import { supabase } from '../config/supabase.js';
-export const add = async (purchaseId, keterangan, action) => {
-    const { data, error } = await supabase.from('log_purchases').insert([
+
+export const logPurchaseModel = {
+  async add(purchaseId, keterangan, action) {
+    const { data, error } = await supabase
+      .from('log_purchases')
+      .insert([
         {
-            purchaseId: purchaseId,
-            keterangan: keterangan, 
-            action: action,
-            created_at: new Date().getDate()
-        }
-    ]).select();
+          purchase_id: purchaseId,
+          keterangan: keterangan,
+          action: action,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select();
 
     if (error) throw error;
-    return data[0];
-}
+    return data?.[0];
+  },
+
+  async findByPurchaseId(purchaseId) {
+    const { data, error } = await supabase
+      .from('log_purchases')
+      .select('*')
+      .eq('purchase_id', purchaseId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+};
+
+export const add = logPurchaseModel.add;

@@ -77,10 +77,15 @@ export const FoodModel = {
    * Mengambil satu data barang berdasarkan ID
    */
   async findById(id) {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId) || parsedId <= 0) {
+      return null;
+    }
+
     let { data, error } = await supabase
       .from('products')
       .select(WITH_RELATIONS)
-      .eq('id', id)
+      .eq('id', parsedId)
       .maybeSingle();
 
     if (error && (error.message?.includes('categories') || error.code === 'PGRST200')) {
