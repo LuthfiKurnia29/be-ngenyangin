@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
@@ -11,8 +12,8 @@ export const config = {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
   midtrans: {
-    serverKey: process.env.MIDTRANS_SERVER_KEY || '',
-    clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+    serverKey: (process.env.MIDTRANS_SERVER_KEY || '').trim(),
+    clientKey: (process.env.MIDTRANS_CLIENT_KEY || '').trim(),
+    isProduction: (process.env.MIDTRANS_IS_PRODUCTION || '').trim().toLowerCase() === 'true',
   },
 };

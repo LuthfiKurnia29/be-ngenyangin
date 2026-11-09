@@ -32,6 +32,65 @@ const parseNumericId = (candidate) => {
   return null;
 };
 
+async function applyMidtransStatus(purchase, notificationPayload, mappedStatus) {
+  if (!mappedStatus || purchase.status === mappedStatus) {
+    return {
+      success: true,
+      order_number: notificationPayload.order_id,
+      status: mappedStatus || purchase.status,
+      transaction_status: notificationPayload.transaction_status,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const currentTimeline = Array.isArray(purchase.timeline) ? purchase.timeline : [];
+  const updatedTimeline = [
+    ...currentTimeline,
+    {
+      status: mappedStatus,
+      timestamp: now,
+      note: `Status pembayaran diperbarui via Midtrans: ${notificationPayload.transaction_status} (metode: ${notificationPayload.payment_type || 'online'})`,
+    },
+  ];
+
+  await PurchaseModel.update(purchase.id, {
+    status: mappedStatus,
+    timeline: updatedTimeline,
+  });
+
+  try {
+    await logPurchaseModel.add(
+      purchase.id,
+      `Pembayaran berstatus ${notificationPayload.transaction_status} -> Pesanan ${mappedStatus}`,
+      notificationPayload.transaction_status.toUpperCase()
+    );
+  } catch (logErr) {
+    console.warn('Gagal mencatat log_purchases:', logErr.message);
+  }
+
+  if (mappedStatus === 'Diproses') {
+    const details = purchase.detail_purchases || (await detailPurchaseModel.findByPurchaseId(purchase.id));
+    for (const detail of details) {
+      try {
+        const product = await FoodModel.findById(detail.product_id);
+        if (product && product.stock !== undefined && product.stock !== null) {
+          const newStock = Math.max(0, product.stock - detail.quantity);
+          await FoodModel.update(product.id, { stock: newStock });
+        }
+      } catch (stockErr) {
+        console.error(`Gagal mengurangi stok produk ID ${detail.product_id}:`, stockErr);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    order_number: notificationPayload.order_id,
+    status: mappedStatus,
+    transaction_status: notificationPayload.transaction_status,
+  };
+}
+
 /**
  * Helper untuk mengekstrak ID produk yang valid dari berbagai variasi payload FE
  */
@@ -397,58 +456,7 @@ export const purchaseService = {
       };
     }
 
-    // 4. Update status dan kurangi stok jika transaksi berhasil (settlement/capture accept)
-    if (purchase.status !== mappedStatus) {
-      const now = new Date().toISOString();
-      const currentTimeline = Array.isArray(purchase.timeline) ? purchase.timeline : [];
-      const updatedTimeline = [
-        ...currentTimeline,
-        {
-          status: mappedStatus,
-          timestamp: now,
-          note: `Status pembayaran diperbarui via Midtrans: ${transaction_status} (metode: ${notificationPayload.payment_type || 'online'})`,
-        },
-      ];
-
-      await PurchaseModel.update(purchase.id, {
-        status: mappedStatus,
-        timeline: updatedTimeline,
-      });
-
-      // Catat log
-      try {
-        await logPurchaseModel.add(
-          purchase.id,
-          `Pembayaran berstatus ${transaction_status} -> Pesanan ${mappedStatus}`,
-          transaction_status.toUpperCase()
-        );
-      } catch (logErr) {
-        console.warn('Gagal mencatat log_purchases:', logErr.message);
-      }
-
-      // Kurangi stok jika pembayaran berhasil
-      if (mappedStatus === 'Diproses') {
-        const details = purchase.detail_purchases || (await detailPurchaseModel.findByPurchaseId(purchase.id));
-        for (const detail of details) {
-          try {
-            const product = await FoodModel.findById(detail.product_id);
-            if (product && product.stock !== undefined && product.stock !== null) {
-              const newStock = Math.max(0, product.stock - detail.quantity);
-              await FoodModel.update(product.id, { stock: newStock });
-            }
-          } catch (stockErr) {
-            console.error(`Gagal mengurangi stok produk ID ${detail.product_id}:`, stockErr);
-          }
-        }
-      }
-    }
-
-    return {
-      success: true,
-      order_number: order_id,
-      status: mappedStatus,
-      transaction_status,
-    };
+    return applyMidtransStatus(purchase, notificationPayload, mappedStatus);
   },
 
   /**
@@ -478,6 +486,15 @@ export const purchaseService = {
 
     // Panggil status API Midtrans
     const midtransStatus = await midtransService.getTransactionStatus(purchase.order_number);
+    if (!midtransStatus) {
+      return {
+        order: purchase,
+        midtrans: {
+          transaction_status: 'not_found',
+          status_message: 'Transaksi untuk pesanan ini belum ditemukan di Midtrans.',
+        },
+      };
+    }
 
     // Sinkronkan ke database jika ada perbedaan status
     const mappedStatus = midtransService.mapStatus(
@@ -486,7 +503,7 @@ export const purchaseService = {
     );
 
     if (mappedStatus && mappedStatus !== purchase.status) {
-      await this.handleMidtransNotification(midtransStatus);
+      await applyMidtransStatus(purchase, midtransStatus, mappedStatus);
       purchase = await PurchaseModel.findById(purchase.id);
     }
 

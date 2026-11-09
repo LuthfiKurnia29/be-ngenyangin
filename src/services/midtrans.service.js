@@ -3,11 +3,36 @@ import { snap, coreApi } from '../config/midtrans.js';
 import { config } from '../config/env.js';
 import { AppError } from '../utils/errors.js';
 
+function requireServerKey() {
+  if (!config.midtrans.serverKey) {
+    throw new AppError(
+      'Backend belum memuat MIDTRANS_SERVER_KEY. Pastikan key ada di be-ngenyangin/.env, lalu restart backend.',
+      503
+    );
+  }
+}
+
+function midtransRequestError(action, error) {
+  if (error.httpStatusCode === 401) {
+    return new AppError(
+      `Midtrans menolak autentikasi saat ${action}. Pastikan MIDTRANS_SERVER_KEY valid dan MIDTRANS_IS_PRODUCTION sesuai dengan mode key di dashboard Midtrans.`,
+      502
+    );
+  }
+
+  return new AppError(
+    `Gagal ${action}: ${error.message || error}`,
+    502
+  );
+}
+
 export const midtransService = {
   /**
    * Buat Snap Transaction token & redirect URL di Midtrans
    */
   async createSnapTransaction({ orderNumber, total, items = [], customer = {} }) {
+    requireServerKey();
+
     try {
       const parameter = {
         transaction_details: {
@@ -62,10 +87,7 @@ export const midtransService = {
         redirect_url: transaction.redirect_url,
       };
     } catch (error) {
-      throw new AppError(
-        `Gagal membuat transaksi Midtrans: ${error.message || error}`,
-        error.httpStatusCode || 500
-      );
+      throw midtransRequestError('membuat transaksi pembayaran', error);
     }
   },
 
@@ -88,14 +110,17 @@ export const midtransService = {
    * Cek status transaksi langsung dari Midtrans API
    */
   async getTransactionStatus(orderNumber) {
+    requireServerKey();
+
     try {
       const response = await coreApi.transaction.status(orderNumber);
       return response;
     } catch (error) {
-      throw new AppError(
-        `Gagal memeriksa status pembayaran Midtrans: ${error.message || error}`,
-        error.httpStatusCode || 500
-      );
+      if (error.httpStatusCode === 404) {
+        return null;
+      }
+
+      throw midtransRequestError('memeriksa status pembayaran', error);
     }
   },
 
@@ -126,4 +151,3 @@ export const midtransService = {
     return null;
   },
 };
-

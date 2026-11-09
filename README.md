@@ -63,6 +63,16 @@ backend-ngenyangin/
    SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
    ```
 
+## 💳 Konfigurasi Midtrans
+
+1. Salin `.env.example` menjadi `.env` di folder `be-ngenyangin`.
+2. Ambil **Server Key** dan **Client Key** dari **Midtrans Dashboard -> Settings -> Access Keys**.
+3. Isi `MIDTRANS_SERVER_KEY` dan `MIDTRANS_CLIENT_KEY` dengan key dari environment yang sama.
+4. Gunakan `MIDTRANS_IS_PRODUCTION=false` untuk key sandbox atau `true` untuk key production.
+5. Restart backend setelah mengubah `.env`.
+
+Jangan gunakan Client Key sebagai `MIDTRANS_SERVER_KEY` dan jangan bagikan Server Key ke frontend.
+
 ## 🌱 Cara Seeding Data ke Supabase
 
 Ada 2 cara yang bisa dipilih:
