@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, logout, getMe, register, updateProfile, uploadAvatar } from '../controllers/auth.controller.js';
+import { getUserCount, login, logout, getMe, register, updateProfile, uploadAvatar } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { imageUpload } from '../middlewares/upload.js';
 
@@ -17,6 +17,9 @@ router.post('/logout', logout);
 // Endpoint Get Current User Session (Protected)
 router.get('/me', requireAuth, getMe);
 
+// Jumlah pengguna hanya tersedia untuk dashboard admin
+router.get('/admin/user-count', requireAuth, getUserCount);
+
 // Endpoint Update Profil (Protected)
 router.put('/profile', requireAuth, updateProfile);
 
@@ -24,4 +27,3 @@ router.put('/profile', requireAuth, updateProfile);
 router.post('/avatar', requireAuth, imageUpload.single('image'), uploadAvatar);
 
 export default router;
-

@@ -13,6 +13,8 @@ backend-ngenyangin/
 ├── README.md                     # Dokumentasi proyek
 ├── database/                     # Skrip SQL untuk Supabase
 │   ├── schema.sql                # DDL skema tabel (users, foods)
+│   ├── migration_site_content.sql # Konten admin dan persetujuan syarat daftar
+│   ├── migration_complaints.sql   # Catatan pengaduan yang dimasukkan admin
 │   └── seed.sql                  # Data awal dalam format SQL
 ├── scripts/                      # Skrip utilitas CLI
 │   └── seed.js                   # Skrip seeder otomatis via Supabase JS SDK
@@ -54,8 +56,11 @@ backend-ngenyangin/
    - Buka file [database/schema.sql](file:///Users/maxindopro1215/Documents/College/Lomba/GardaTech/backend-ngenyangin/database/schema.sql), salin isinya, lalu jalankan (**Run**) di SQL Editor.
 3. Dapatkan API Credentials:
    - Masuk ke **Project Settings -> API**.
-   - Salin **Project URL** dan **anon (public)** key atau **service_role (secret)** key.
-4. Isi file `.env`:
+   - Salin **Project URL** dan **service_role (secret)** key untuk backend. Jangan pernah menaruh key ini di frontend atau mengirimkannya ke client.
+4. Untuk database yang sudah berjalan, jalankan `database/migration_site_content.sql` di SQL Editor.
+5. Jalankan `database/seed_site_content.sql` untuk mengisi 15 FAQ per audiens, kebijakan keamanan pangan, dan syarat & ketentuan. Seed ini aman dijalankan ulang dan tidak menimpa konten yang sudah disimpan admin.
+6. Jalankan `database/migration_complaints.sql` untuk menambahkan tabel pencatatan pengaduan oleh admin.
+7. Isi file `.env`:
    ```env
    PORT=5000
    SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxxx.supabase.co
@@ -92,6 +97,16 @@ Buka file [database/seed.sql](file:///Users/maxindopro1215/Documents/College/Lom
 
 ## 📡 Endpoint Tersedia
 
+### Konten situs
+- `GET /api/v1/content/:type/:audience` : Konten publik (`type`: `faq`, `food_policy`, `contact`, `terms`; `audience`: `consumer`, `supplier`, atau `all` untuk kontak).
+- `GET /api/v1/content/admin` : Daftar konten (wajib login sebagai admin).
+- `PUT /api/v1/content/admin/:type/:audience` : Simpan konten (wajib login sebagai admin; body `{ "content": ... }`).
+- Pendaftaran konsumen dan supplier wajib mengirim `termsAccepted: true` serta `termsVersion` yang sama dengan versi syarat terkini.
+
+### Pengaduan
+- Konsumen dan supplier menyampaikan pengaduan melalui nomor admin yang ditampilkan pada footer.
+- Admin mencatat pengaduan secara manual melalui `GET/POST /api/v1/complaints`, memperbarui tindak lanjut dengan `PUT /api/v1/complaints/:id`, atau menghapus catatan dengan `DELETE /api/v1/complaints/:id`. Semua endpoint memerlukan autentikasi admin.
+
 ### Public & Health
 - `GET /` : Root greeting
 - `GET /api/v1/health` : Health check status
@@ -113,7 +128,7 @@ Buka file [database/seed.sql](file:///Users/maxindopro1215/Documents/College/Lom
 - `POST /api/v1/products/upload` : Upload gambar produk (Header: `Authorization: Bearer <token>`, multipart field: `image`)
 
 ### Autentikasi & Sesi User
-- `POST /api/v1/auth/register` : Mendaftarkan akun user baru (body: `email`, `password`, `name`, `role` [consumer|supplier])
+- `POST /api/v1/auth/register` : Mendaftarkan akun user baru (body: `email`, `password`, `name`, `role` [consumer|supplier], `termsAccepted: true`, `termsVersion`)
 - `POST /api/v1/auth/login` : Login user dengan email dan password (body: `email`, `password`)
 - `POST /api/v1/auth/logout` : Logout user / invalidate session
 - `GET /api/v1/auth/me` : Mendapatkan data user & session aktif (Header: `Authorization: Bearer <access_token>`)
