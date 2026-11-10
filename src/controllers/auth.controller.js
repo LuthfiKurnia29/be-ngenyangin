@@ -90,3 +90,42 @@ export const uploadAvatar = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Lupa Password - Kirim token reset via email
+ * POST /api/v1/auth/forgot-password
+ */
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const data = await authService.forgotPassword(req.body);
+    return successResponse(res, 200, data.message);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Verifikasi token reset password
+ * POST /api/v1/auth/verify-reset-token
+ */
+export const verifyResetToken = async (req, res, next) => {
+  try {
+    const data = await authService.verifyResetToken(req.body);
+    return successResponse(res, 200, 'Token reset password valid.', data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Reset Password
+ * POST /api/v1/auth/reset-password
+ */
+export const resetPassword = async (req, res, next) => {
+  try {
+    const data = await authService.resetPassword(req.body);
+    return successResponse(res, 200, data.message);
+  } catch (err) {
+    next(err);
+  }
+};
