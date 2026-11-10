@@ -17,9 +17,13 @@ export const FoodModel = {
   /**
    * Mengambil semua data barang / makanan dengan opsi query
    */
-  async findAll({ search, category, category_id, categoryId, supplier_id, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
+  async findAll({ search, category, category_id, categoryId, supplier_id, availableOnly, sortBy = 'created_at', order = 'desc', limit, page = 1 } = {}) {
     const buildQuery = (selectStr) => {
       let query = supabase.from('products').select(selectStr, { count: 'exact' });
+
+      if (String(availableOnly).toLowerCase() === 'true') {
+        query = query.eq('is_active', true).gt('stock', 0);
+      }
 
       const catId = category_id || categoryId;
       if (catId) {

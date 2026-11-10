@@ -1,5 +1,19 @@
 import { authService } from '../services/auth.service.js';
+import { AppError } from '../utils/errors.js';
 import { successResponse } from '../utils/response.js';
+
+export const getUserCount = async (req, res, next) => {
+  try {
+    if (req.user?.profile?.role !== 'admin') {
+      throw new AppError('Akses hanya untuk admin.', 403);
+    }
+    return successResponse(res, 200, 'Jumlah pengguna berhasil diambil.', {
+      count: await authService.getUserCount(),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 /**
  * Register User Baru

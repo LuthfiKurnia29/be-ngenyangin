@@ -26,6 +26,9 @@ router.post('/reset-password', resetPassword);
 // Endpoint Get Current User Session (Protected)
 router.get('/me', requireAuth, getMe);
 
+// Jumlah pengguna hanya tersedia untuk dashboard admin
+router.get('/admin/user-count', requireAuth, getUserCount);
+
 // Endpoint Update Profil (Protected)
 router.put('/profile', requireAuth, updateProfile);
 

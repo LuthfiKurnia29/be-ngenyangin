@@ -1,6 +1,15 @@
 import { supabase } from '../config/supabase.js';
 
 export const UserModel = {
+  async count() {
+    const { count, error } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true });
+
+    if (error) throw error;
+    return count ?? 0;
+  },
+
   /**
    * Cari user berdasarkan ID
    */
@@ -58,4 +67,3 @@ export const UserModel = {
     return data;
   },
 };
-

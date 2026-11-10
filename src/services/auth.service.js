@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase.js';
 import { config } from '../config/env.js';
 import { UserModel } from '../models/user.model.js';
+import { siteContentService } from './siteContent.service.js';
 import { PasswordResetModel } from '../models/passwordReset.model.js';
 import { emailService } from './email.service.js';
 import { AppError } from '../utils/errors.js';
@@ -31,10 +32,30 @@ const toProfile = (profile, fallback = {}) => ({
 });
 
 export const authService = {
+  async getUserCount() {
+    try {
+      return await UserModel.count();
+    } catch (error) {
+      throw new AppError(`Gagal mengambil jumlah pengguna: ${error.message}`, 500);
+    }
+  },
+
   /**
    * Pendaftaran akun baru
    */
-  async register({ name, email, password, phone, gender, role = 'consumer' }) {
+  async register({
+    name,
+    email,
+    password,
+    phone,
+    gender,
+    role = 'consumer',
+    outlet,
+    address,
+    description,
+    termsAccepted,
+    termsVersion,
+  }) {
     if (!email || !password) {
       throw new AppError('Email dan password wajib diisi.', 400);
     }
@@ -43,9 +64,21 @@ export const authService = {
       throw new AppError('Password minimal harus 6 karakter.', 400);
     }
 
-    const allowedRoles = ['consumer', 'supplier', 'courier', 'admin'];
+    const allowedRoles = ['consumer', 'supplier'];
     if (!allowedRoles.includes(role)) {
       throw new AppError('Peran tidak valid.', 400);
+    }
+
+    if (termsAccepted !== true) {
+      throw new AppError('Persetujuan Syarat & Ketentuan wajib diberikan.', 400);
+    }
+    if (role === 'supplier' && !String(outlet || '').trim()) {
+      throw new AppError('Nama toko atau outlet wajib diisi untuk supplier.', 400);
+    }
+
+    const currentTerms = await siteContentService.getPublic('terms', role);
+    if (!Number.isInteger(termsVersion) || termsVersion !== currentTerms.version) {
+      throw new AppError('Syarat & Ketentuan telah diperbarui. Muat ulang halaman dan setujui versi terbaru.', 409);
     }
 
     const existingUser = await UserModel.findByEmail(email).catch(() => null);
@@ -93,6 +126,11 @@ export const authService = {
         role,
         phone: phone || null,
         gender: role === 'consumer' && ['male', 'female'].includes(gender) ? gender : null,
+        outlet: role === 'supplier' ? String(outlet || '').trim() || null : null,
+        address: role === 'supplier' ? String(address || '').trim() || null : null,
+        description: role === 'supplier' ? String(description || '').trim() || null : null,
+        terms_version: currentTerms.version,
+        terms_accepted_at: new Date().toISOString(),
       });
     } catch (err) {
       console.warn('Gagal menyimpan profil user ke tabel users:', err.message);
