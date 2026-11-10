@@ -1,21 +1,28 @@
 import { Router } from 'express';
-import { createPurchase, updatePurchase, getPurchaseById, deletePurchase } from '../controllers/purchase.controller.js';
+import {
+  createPurchase,
+  createPayment,
+  handleNotification,
+  checkPaymentStatus,
+  getAllPurchases,
+  getPurchaseById,
+  updatePurchase,
+  deletePurchase,
+} from '../controllers/purchase.controller.js';
+import { requireAuth } from '../middlewares/auth.js';
 
 const router = Router();
 
-// GET semua data barang / makanan (mendukung query filter & paginasi)
-// router.get('/', getAllFoods);
+// 1. Webhook Notifikasi Midtrans (Publik - tanpa token JWT, diverifikasi melalui Signature Key)
+router.post('/notification', handleNotification);
 
-// GET detail satu data barang / makanan
-router.get('/:id', getPurchaseById);
-
-// POST tambah data barang / makanan baru
-router.post('/', createPurchase);
-
-// PUT update data barang / makanan
-router.put('/:id', updatePurchase);
-
-// DELETE hapus data barang / makanan
-router.delete('/:id', deletePurchase);
+// 2. Transaksi & Status Pembayaran (Terautentikasi)
+router.get('/', requireAuth, getAllPurchases);
+router.post('/', requireAuth, createPurchase);
+router.post('/:id/pay', requireAuth, createPayment); // Tombol "Bayar Sekarang"
+router.get('/:id/status', requireAuth, checkPaymentStatus);
+router.get('/:id', requireAuth, getPurchaseById);
+router.put('/:id', requireAuth, updatePurchase);
+router.delete('/:id', requireAuth, deletePurchase);
 
 export default router;

@@ -2,6 +2,8 @@ import { supabase } from '../config/supabase.js';
 import { config } from '../config/env.js';
 import { UserModel } from '../models/user.model.js';
 import { siteContentService } from './siteContent.service.js';
+import { PasswordResetModel } from '../models/passwordReset.model.js';
+import { emailService } from './email.service.js';
 import { AppError } from '../utils/errors.js';
 import {
   hashMD5,
@@ -9,6 +11,7 @@ import {
   generateSessionToken,
   verifySessionToken,
 } from '../utils/crypto.js';
+import crypto from 'node:crypto';
 
 const toProfile = (profile, fallback = {}) => ({
   id: profile?.id ?? fallback.id ?? null,
@@ -426,5 +429,117 @@ export const authService = {
     if (profileError) throw new AppError(`Foto berhasil diunggah tetapi gagal menyimpan profil: ${profileError.message}`, 500);
 
     return { avatar_url: data.publicUrl, path };
+  },
+
+  /**
+   * Lupa Password - Kirim token reset via email
+   */
+  async forgotPassword({ email }) {
+    if (!email) {
+      throw new AppError('Email wajib diisi.', 400);
+    }
+
+    // Cek apakah email terdaftar
+    const user = await UserModel.findByEmail(email).catch(() => null);
+    if (!user) {
+      // Untuk keamanan, jangan beritahu bahwa email tidak terdaftar
+      return {
+        message: 'Jika email terdaftar, kami akan mengirimkan instruksi reset password.',
+      };
+    }
+
+    // Generate token 6 digit angka (untuk OTP-style)
+    const resetToken = crypto.randomInt(100000, 999999).toString();
+
+    // Simpan token ke tabel password_reset_tokens
+    await PasswordResetModel.upsert(email, resetToken);
+
+    // Kirim email
+    try {
+      await emailService.sendResetPasswordEmail(email, user.name, resetToken);
+    } catch (err) {
+      console.error('Gagal mengirim email reset password:', err.message);
+      throw new AppError('Gagal mengirim email reset password. Silakan coba lagi.', 500);
+    }
+
+    return {
+      message: 'Jika email terdaftar, kami akan mengirimkan instruksi reset password.',
+    };
+  },
+
+  /**
+   * Verifikasi token reset password
+   */
+  async verifyResetToken({ email, token }) {
+    if (!email || !token) {
+      throw new AppError('Email dan token wajib diisi.', 400);
+    }
+
+    const record = await PasswordResetModel.findByEmail(email);
+    if (!record) {
+      throw new AppError('Token reset password tidak ditemukan atau sudah kedaluwarsa.', 400);
+    }
+
+    // Cek apakah token cocok
+    if (record.token !== token.trim()) {
+      throw new AppError('Token reset password tidak valid.', 400);
+    }
+
+    // Cek kadaluwarsa (15 menit)
+    const tokenAge = Date.now() - new Date(record.created_at).getTime();
+    const fifteenMinutes = 15 * 60 * 1000;
+    if (tokenAge > fifteenMinutes) {
+      await PasswordResetModel.deleteByEmail(email);
+      throw new AppError('Token reset password sudah kedaluwarsa. Silakan minta token baru.', 400);
+    }
+
+    return { valid: true, email };
+  },
+
+  /**
+   * Reset password dengan token yang sudah diverifikasi
+   */
+  async resetPassword({ email, token, password }) {
+    if (!email || !token || !password) {
+      throw new AppError('Email, token, dan password baru wajib diisi.', 400);
+    }
+
+    if (password.length < 6) {
+      throw new AppError('Password baru minimal harus 6 karakter.', 400);
+    }
+
+    // Verifikasi token terlebih dahulu
+    await this.verifyResetToken({ email, token });
+
+    // Cari user
+    const user = await UserModel.findByEmail(email).catch(() => null);
+    if (!user) {
+      throw new AppError('Akun tidak ditemukan.', 404);
+    }
+
+    // Update password di tabel users (hash MD5)
+    const hashedPassword = hashMD5(password);
+    await UserModel.update(user.id, { password: hashedPassword });
+
+    // Update password di Supabase Auth jika tersedia
+    try {
+      if (config.supabase.serviceRoleKey && supabase.auth.admin?.updateUserById) {
+        // Cari user Supabase berdasarkan email
+        const { data: { users } } = await supabase.auth.admin.listUsers();
+        const supabaseUser = users?.find((u) => u.email === email);
+        if (supabaseUser) {
+          await supabase.auth.admin.updateUserById(supabaseUser.id, { password });
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal update password di Supabase Auth:', err.message);
+    }
+
+    // Hapus token setelah berhasil digunakan
+    await PasswordResetModel.deleteByEmail(email);
+
+    return {
+      message: 'Password berhasil direset. Silakan login dengan password baru Anda.',
+    };
   },
 };
